@@ -1,44 +1,38 @@
-var builder = WebApplication.CreateBuilder(args);
+using System.Net;
+using DotNetEnv;
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+class Program
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    static void Main()
+    {
+        // Load values from the .env file
+        Env.Load();
 
-app.UseHttpsRedirection();
+        string accessToken = Environment.GetEnvironmentVariable("ACCESS_TOKEN");
+        string clientId = Environment.GetEnvironmentVariable("CLIENT_ID");
+        string clientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET");
+        string redirectUri = Environment.GetEnvironmentVariable("REDIRECT_URI");
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+        // Step 1: Redirect user to the Strava authorization URL
+        string authorizationUrl = $"https://www.strava.com/oauth/authorize?client_id={clientId}&redirect_uri={WebUtility.UrlEncode(redirectUri)}&response_type=code&scope=read_all";
+        Console.WriteLine($"Visit the following URL to authorize the application:\n{authorizationUrl}");
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
+        // Step 2: Retrieve the authorization code from the user (usually via a callback URL)
 
-app.Run();
+        Console.Write("Enter the authorization code: ");
+        string authorizationCode = Console.ReadLine();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+        // Step 3: Exchange authorization code for access token
+        string tokenUrl = "https://www.strava.com/oauth/token";
+        string postData = $"client_id={clientId}&client_secret={clientSecret}&code={authorizationCode}&grant_type=authorization_code";
+
+        using (WebClient client = new WebClient())
+        {
+            client.Headers[HttpRequestHeader.ContentType] = "application/x-www-form-urlencoded";
+            string response = client.UploadString(tokenUrl, "POST", postData);
+            Console.WriteLine($"Access Token Response:\n{response}");
+        }
+
+        Console.ReadLine();
+    }
 }
